@@ -34,9 +34,9 @@ uint16_t reg[R_COUNT];
 
 
 enum{
-    FL_POS = 1 << 0,
-    FL_ZRO = 1 << 1,
-    FL_NEG = 1 << 2
+    FL_POS = 1 << 0,        // 0000000000000001
+    FL_ZRO = 1 << 1,        // 0000000000000010
+    FL_NEG = 1 << 2         // 0000000000000100
 };
 
 
@@ -89,43 +89,74 @@ int main(int argc, char** argv){
 
     int running = 1;
     while(running){
-            uint16_t insrt = mem_read(reg[R_PC]++);
-            uint16_t op = insrt >> 12;
+        uint16_t instr = mem_read(reg[R_PC]++);
+        uint16_t op = instr >> 12;
 
-            switch(op){
-                case  OP_ADD:{
-                    // destnation register
-                    uint16_t r0 = (insrt >> 9) & 0x7;
-                    
-                    //source register(SR1)
-                    uint16_t r1 = (insrt << 6) & 0x7;
+        switch(op){
+            case  OP_ADD:{
+                // destnation register
+                uint16_t r0 = (instr >> 9) & 0x7;
 
-                    // flage (bit 5 of instruction set)
-                    uint16_t imm_flag = (insrt << 5) & 0x1;
+                //source register(SR1)
+                uint16_t r1 = (instr << 6) & 0x7;
 
-                    if(imm_flag){
-                        uint16_t imm5 = sign_extend(insrt & 0x1F, 5);
-                        reg[r0] = reg[r1] + imm5;
-                    }
-                    else{
-                        uint16_t r2 = insrt & 0x7;
-                        reg[r0] = reg[r1] + reg[r2];
-                    }
-                    update_flage(r0);
+                // flage (bit 5 of instruction set)
+                uint16_t imm_flag = (instr << 5) & 0x1;
+
+                if(imm_flag){
+                    uint16_t imm5 = sign_extend(instr & 0x1F, 5);
+                    reg[r0] = reg[r1] + imm5;
                 }
-                case OP_LDI :{
-                    uint16_t r0 = (insrt >> 9) & 0x7 ;
-                    uint16_t pcoffset = sign_extend(insrt & 0x1FF, 9);
-                    reg[r0] = mem_read(reg[R_PC + pcoffset]);
-                    update_flage(r0);
+                else{
+                    uint16_t r2 = instr & 0x7;
+                    reg[r0] = reg[r1] + reg[r2];
+                }
+                update_flage(r0);
+            }
+            case OP_LDI :{
+                uint16_t r0 = (instr >> 9) & 0x7 ;
+                uint16_t pcoffset9 = sign_extend(instr & 0x1FF, 9);
+                reg[r0] = mem_read(mem_read(reg[R_PC] + pcoffset9));
+                update_flage(r0);
+            }
+            case OP_AND :{
+                uint16_t r0 = instr >> 9 & 0x7;
+                uint16_t r1 = instr >> 6 & 0x7;
+                uint16_t flag = instr >> 5 & 0x1;
+
+                if(flag){
+                    uint16_t imm5 = sign_extend(instr & 0x1F, 5);
+                    reg[r0] = reg[r1] & imm5;
+                }
+                else{
+                    uint16_t r2 = instr & 0x7; 
+                    reg[r0] = reg[r1] & reg[r2];
+                }
+                update_flage(r0);
+            }
+            case OP_NOT :{
+                uint16_t r0 = instr >> 9 & 0x7; 
+                uint16_t r1 = instr >> 6 & 0x7; 
+                reg[r0] = ~reg[r1];
+                update_flage(r0);
+            }
+            case OP_BR :{
+                uint16_t cond_flag = instr >> 6 & 0x7;
+                uint16_t offset = sign_extend(instr >> 8 & 0x1FF, 9);
+                if(cond_flag & reg[R_COND]){
+                    reg[R_PC] += offset;
                 }
             }
+            case OP_JMP:{
+                uint16_t r1 = (instr >> 6) & 0x7;
+                reg[R_PC] = reg[r1];
+            }
+            case OP_JSR:{
+                
+            }
+        }
     }
-
-
-
 }
-
 
 uint16_t sign_extend(uint16_t x, int bit_count){        // convert negative binary and posetive binary numbers to 16 bits
     if((x >> (bit_count - 1)) & 1){
@@ -145,13 +176,3 @@ void update_flage(uint16_t r){
         reg[R_COND] = FL_POS;
     }
 }
-
-
-
-
-
-
-
-
-
-
