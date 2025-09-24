@@ -12,7 +12,7 @@
 
 void update_flage(uint16_t r);
 uint16_t sign_extend(uint16_t x, int bit_count);
-                         
+
 #define Mem_Max (1 << 16) // [0][0][0][0][0][0][0][0][0][0][0][0][0][0][0][1] after shifting [0][0][0][0][0][0][0][0][0][0][0][0][0][0][0][1]
 uint16_t memory[Mem_Max]; //   655236 places that everyone of them has 16 bit long; 128 Kb 
 
@@ -152,7 +152,46 @@ int main(int argc, char** argv){
                 reg[R_PC] = reg[r1];
             }
             case OP_JSR:{
-                
+                uint16_t long_flag = (instr >> 11) & 1;
+                reg[R_R7] = reg[R_PC];
+                if(long_flag){
+                    uint16_t pcoffset = sign_extend(instr & 0x7FF, 11);
+                    reg[R_PC] += pcoffset;  // JSR
+                }
+                else{
+                    uint16_t r1 = (instr >> 6) & 0x7;
+                    reg[R_PC] = reg[r1]; /* JSRR */
+                }
+            }
+            case OP_LD:{
+                uint16_t r0 = (instr >> 9) & 0x7;
+                uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+                reg[r0] = mem_read(reg[R_PC] + pc_offset);
+                update_flage(r0);
+            }
+            case OP_LDR:{
+                uint16_t r0 = (instr >> 9) & 0x7;
+                uint16_t r1 = (instr >> 6) & 0x7;
+                uint16_t offset = sign_extend(instr & 0x3F, 6);
+                reg[r0] = mem_read(reg[r1] + offset);
+                update_flage(r0);
+            }
+            case OP_LEA:{
+                uint16_t r0 = (instr >> 9) & 0x7;
+                uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+                reg[r0] = reg[R_PC] + pc_offset;
+                update_flage(r0);
+            }
+            case OP_STI:{
+                uint16_t r0 = (instr >> 9) & 0x7;
+                uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+                mem_write(mem_read(reg[R_PC] + pc_offset), reg[r0]);
+            }
+            case OP_STR:{
+                    uint16_t r0 = (instr >> 9) & 0x7;
+                    uint16_t r1 = (instr >> 6) & 0x7;
+                    uint16_t offset = sign_extend(instr & 0x3F, 6);
+                    mem_write(reg[r1] + offset, reg[r0]);
             }
         }
     }
