@@ -1,4 +1,3 @@
-#include "Lc3.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <signal.h>
@@ -10,6 +9,9 @@
 #include <sys/types.h>
 #include <sys/termios.h>
 #include <sys/mman.h>
+
+void update_flage(uint16_t r);
+uint16_t sign_extend(uint16_t x, int bit_count);
                          
 #define Mem_Max (1 << 16) // [0][0][0][0][0][0][0][0][0][0][0][0][0][0][0][1] after shifting [0][0][0][0][0][0][0][0][0][0][0][0][0][0][0][1]
 uint16_t memory[Mem_Max]; //   655236 places that everyone of them has 16 bit long; 128 Kb 
@@ -66,7 +68,7 @@ enum
 
 int main(int argc, char** argv){
     /* if (argc < 2){ */
-    /*     /* show usage string */ 
+    /*      show usage string */ 
     /*     printf("lc3 [image-file1] ...\n"); */
     /*     exit(2); */
     /* } */
@@ -91,11 +93,32 @@ int main(int argc, char** argv){
             uint16_t op = insrt >> 12;
 
             switch(op){
-                case  OP_ADD:
-                 return 0 ;
+                case  OP_ADD:{
+                    // destnation register
+                    uint16_t r0 = (insrt >> 9) & 0x7;
+                    
+                    //source register(SR1)
+                    uint16_t r1 = (insrt << 6) & 0x7;
 
-                case OP_AND :
-                    return 0;
+                    // flage (bit 5 of instruction set)
+                    uint16_t imm_flag = (insrt << 5) & 0x1;
+
+                    if(imm_flag){
+                        uint16_t imm5 = sign_extend(insrt & 0x1F, 5);
+                        reg[r0] = reg[r1] + imm5;
+                    }
+                    else{
+                        uint16_t r2 = insrt & 0x7;
+                        reg[r0] = reg[r1] + reg[r2];
+                    }
+                    update_flage(r0);
+                }
+                case OP_LDI :{
+                    uint16_t r0 = (insrt >> 9) & 0x7 ;
+                    uint16_t pcoffset = sign_extend(insrt & 0x1FF, 9);
+                    reg[r0] = mem_read(reg[R_PC + pcoffset]);
+                    update_flage(r0);
+                }
             }
     }
 
@@ -104,8 +127,24 @@ int main(int argc, char** argv){
 }
 
 
+uint16_t sign_extend(uint16_t x, int bit_count){        // convert negative binary and posetive binary numbers to 16 bits
+    if((x >> (bit_count - 1)) & 1){
+        x |= (0xFFFF2 << bit_count);
+    }
+    return x;
+}
 
-
+void update_flage(uint16_t r){
+    if(reg[r] == 0){
+        reg[R_COND] = FL_ZRO;
+    }
+    else if(reg[r] << 15){
+        reg[R_COND] = FL_NEG;
+    }
+    else{
+        reg[R_COND] = FL_POS;
+    }
+}
 
 
 
